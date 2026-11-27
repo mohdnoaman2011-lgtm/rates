@@ -1,0 +1,34 @@
+name: Update Sudan Currency Rates
+
+on:
+  schedule:
+    - cron: '0 * * * *' # يعمل عند بداية كل ساعة
+  workflow_dispatch: # يتيح لك تشغيله يدوياً للتجربة في أي وقت
+
+permissions:
+  contents: write # صلاحية تعديل ملف rates.json
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: pip install requests beautifulsoup4
+
+      - name: Run scraper
+        run: python scraper.py
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@://github.com"
+          git add rates.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update currency rates" && git push)
