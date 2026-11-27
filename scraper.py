@@ -18,9 +18,10 @@ def parse_price(raw_str):
 
 def fetch_rates():
     base_url = "https://news.google.com/rss/search"
+    # إضافة when:2d لحصر النتائج في أخبار آخر يومين فقط
     queries = [
-        "سعر الدولار في السودان اليوم السوق الموازي",
-        "أسعار العملات في السودان اليوم السوق الأسود"
+        "سعر الدولار في السودان اليوم السوق الموازي when:2d",
+        "أسعار العملات في السودان اليوم السوق الأسود when:2d"
     ]
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -36,10 +37,9 @@ def fetch_rates():
         }
         try:
             resp = requests.get(base_url, params=query_params, headers=headers, timeout=20)
-            print("Status code:", resp.status_code)
             if resp.status_code == 200:
                 root = ET.fromstring(resp.content)
-                for item in root.findall('.//item')[:20]:
+                for item in root.findall('.//item')[:15]:
                     t = item.find('title').text if item.find('title') is not None else ""
                     d = item.find('description').text if item.find('description') is not None else ""
                     clean_item = BeautifulSoup(f"{t} {d}", 'html.parser').get_text(" ")
@@ -48,18 +48,18 @@ def fetch_rates():
             print("Error:", e)
 
     full_text = " | ".join(all_texts)
-    print("Sample text:", full_text[:300])
     
-    matches = re.findall(r'\b(\d{1,2}[,.]?\d{3})\b', full_text)
-    excluded = {2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028}
+    # استخراج الأرقام المكونة من 5 خانات (مثل 12100 أو 12,100)
+    matches = re.findall(r'\b(\d{2}[,.]?\d{3})\b', full_text)
     valid_usd = []
     
     for m in matches:
         val = parse_price(m)
-        if val and 2500 <= val <= 50000 and val not in excluded:
+        # حصر النطاق المنطقي الحالي بين 10,000 و 30,000 جنيه
+        if val and 10000 <= val <= 30000:
             valid_usd.append(val)
             
-    print("Found valid numbers:", valid_usd)
+    print("Found valid recent USD rates:", valid_usd)
     
     if valid_usd:
         usd = max(set(valid_usd), key=valid_usd.count)
@@ -68,9 +68,9 @@ def fetch_rates():
         egp = round(usd / 50)
         
         return {
-            "USD": {"buy": usd, "sell": usd + 150},
-            "SAR": {"buy": sar, "sell": sar + 40},
-            "AED": {"buy": aed, "sell": aed + 40},
+            "USD": {"buy": usd, "sell": usd + 200},
+            "SAR": {"buy": sar, "sell": sar + 50},
+            "AED": {"buy": aed, "sell": aed + 50},
             "EGP": {"buy": egp, "sell": egp + 5}
         }
         
@@ -87,9 +87,9 @@ def main():
         }
         with open(JSON_FILE, 'w', encoding='utf-8') as f:
             json.dump(output, f, ensure_ascii=False, indent=2)
-        print("SUCCESS: Updated rates.json!")
+        print("SUCCESS: Updated rates.json with accurate daily rates!")
     else:
-        print("WARNING: No numbers matched, keeping fallback.")
+        print("WARNING: No recent numbers matched, keeping existing data.")
 
 if __name__ == "__main__":
     main()
