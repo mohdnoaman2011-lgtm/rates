@@ -1,22 +1,22 @@
 {
-  "last_updated": "2026-11-27T15:17:37.320136+00:00",
-  "source": "fallback",
+  "last_updated": "2026-11-27T15:45:14.308344+00:00",
+  "source": "auto",
   "rates": {
     "USD": {
-      "buy": 12100,
-      "sell": 12400
+      "buy": 4400,
+      "sell": 4550
     },
     "SAR": {
-      "buy": 3220,
-      "sell": 3300
+      "buy": 1173,
+      "sell": 1213
     },
     "AED": {
-      "buy": 3290,
-      "sell": 3370
+      "buy": 1199,
+      "sell": 1239
     },
     "EGP": {
-      "buy": 220,
-      "sell": 230
+      "buy": 88,
+      "sell": 93
     }
   }
 }
