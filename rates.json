@@ -1,13 +1,1 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-
-Future<Map<String, dynamic>> getSudanRates() async {
-  const url = 'https://githubusercontent.com';
-  final response = await http.get(Uri.parse(url));
-
-  if (response.statusCode == 200) {
-    return json.decode(response.body);
-  } else {
-    throw Exception('فشل في تحميل أسعار العملات');
-  }
-}
+{}
