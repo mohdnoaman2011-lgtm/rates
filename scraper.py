@@ -1,6 +1,7 @@
 import json
 import re
 import requests
+import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone
 
@@ -12,51 +13,64 @@ def load_existing_data():
             data = json.load(f)
             if data and "rates" in data and len(data["rates"]) > 0:
                 return data
-    except Exception as e:
-        print(f"Read error: {e}")
+    except:
+        pass
     return None
 
-def fetch_rates_from_web():
-    urls = [
+def parse_price(raw_str):
+    # إزالة الفواصل والمسافات وتحويل النص لرقم صحيح
+    clean = re.sub(r'[^\d]', '', raw_str)
+    return int(clean) if clean else None
+
+def fetch_rates_from_rss():
+    # خلاصات RSS مفتوحة ومستقرة للمواقع الإخبارية السودانية
+    rss_urls = [
         "https://sudanakhbar.com",
-        "https://bazaar.sd"
+        "https://altaghyeer.info"
     ]
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (compatible; CurrencyBot/1.0)'
     }
     
-    for url in urls:
+    for url in rss_urls:
         try:
-            print(f"Trying {url}...")
             resp = requests.get(url, headers=headers, timeout=15)
             if resp.status_code == 200:
-                soup = BeautifulSoup(resp.text, 'html.parser')
-                text = soup.get_text(" ", strip=True)
-                
-                usd_match = re.search(r'(?:دولار|USD)[^\d]{0,30}(\d{4,5})', text)
-                sar_match = re.search(r'(?:سعودي|SAR)[^\d]{0,30}(\d{3,4})', text)
-                aed_match = re.search(r'(?:إماراتي|AED)[^\d]{0,30}(\d{3,4})', text)
-                egp_match = re.search(r'(?:مصري|EGP)[^\d]{0,30}(\d{2,3})', text)
-                
-                if usd_match:
-                    usd = int(usd_match.group(1))
-                    sar = int(sar_match.group(1)) if sar_match else round(usd / 3.75)
-                    aed = int(aed_match.group(1)) if aed_match else round(usd / 3.67)
-                    egp = int(egp_match.group(1)) if egp_match else round(usd / 50)
+                root = ET.fromstring(resp.content)
+                for item in root.findall('.//item'):
+                    title = item.find('title').text or ""
+                    desc = item.find('description').text or ""
+                    full_text = BeautifulSoup(title + " " + desc, 'html.parser').get_text(" ")
                     
-                    return {
-                        "USD": {"buy": usd, "sell": usd + 100},
-                        "SAR": {"buy": sar, "sell": sar + 30},
-                        "AED": {"buy": aed, "sell": aed + 30},
-                        "EGP": {"buy": egp, "sell": egp + 5}
-                    }
+                    # التحقق من أن الخبر يتحدث عن أسعار العملات
+                    if any(w in full_text for w in ['سعر', 'أسعار', 'الدولار', 'الصرف', 'الموازي']):
+                        # البحث عن رقم من 4 أو 5 خانات (مع أو بدون فاصلة) بجانب كلمة دولار
+                        usd_match = re.search(r'(?:دولار|USD)[^\d]{0,35}(\d{1,2}[,.]?\d{3})', full_text)
+                        if usd_match:
+                            usd = parse_price(usd_match.group(1))
+                            # التأكد من أن الرقم منطقي (بين 2000 و 50000)
+                            if usd and 2000 <= usd <= 50000:
+                                sar_m = re.search(r'(?:سعودي|SAR)[^\d]{0,35}(\d{1,2}[,.]?\d{3})', full_text)
+                                aed_m = re.search(r'(?:إماراتي|AED)[^\d]{0,35}(\d{1,2}[,.]?\d{3})', full_text)
+                                egp_m = re.search(r'(?:مصري|EGP)[^\d]{0,35}(\d{2,4})', full_text)
+                                
+                                sar = parse_price(sar_m.group(1)) if sar_m else round(usd / 3.75)
+                                aed = parse_price(aed_m.group(1)) if aed_m else round(usd / 3.67)
+                                egp = parse_price(egp_m.group(1)) if egp_m else round(usd / 50)
+                                
+                                return {
+                                    "USD": {"buy": usd, "sell": usd + 100},
+                                    "SAR": {"buy": sar, "sell": sar + 30},
+                                    "AED": {"buy": aed, "sell": aed + 30},
+                                    "EGP": {"buy": egp, "sell": egp + 5}
+                                }
         except Exception as e:
-            print(f"Failed on {url}: {e}")
+            print(f"RSS error on {url}: {e}")
             
     return None
 
 def main():
-    new_rates = fetch_rates_from_web()
+    new_rates = fetch_rates_from_rss()
     
     if new_rates:
         output = {
@@ -66,25 +80,9 @@ def main():
         }
         with open(JSON_FILE, 'w', encoding='utf-8') as f:
             json.dump(output, f, ensure_ascii=False, indent=2)
-        print("SUCCESS: Updated rates.json with live data!")
+        print("SUCCESS: Updated with live RSS rates!")
     else:
-        old_data = load_existing_data()
-        if old_data:
-            print("WARNING: Fetch failed, keeping existing rates.")
-        else:
-            fallback = {
-                "last_updated": datetime.now(timezone.utc).isoformat(),
-                "source": "fallback",
-                "rates": {
-                    "USD": {"buy": 12100, "sell": 12400},
-                    "SAR": {"buy": 3220, "sell": 3300},
-                    "AED": {"buy": 3290, "sell": 3370},
-                    "EGP": {"buy": 220, "sell": 230}
-                }
-            }
-            with open(JSON_FILE, 'w', encoding='utf-8') as f:
-                json.dump(fallback, f, ensure_ascii=False, indent=2)
-            print("INFO: Initialized rates.json with fallback data.")
+        print("WARNING: Could not find new rates in RSS, keeping existing data.")
 
 if __name__ == "__main__":
     main()
