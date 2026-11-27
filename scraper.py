@@ -11,7 +11,6 @@ def parse_price(raw_str):
     return int(clean) if clean else None
 
 def fetch_from_search():
-    # البحث المباشر عن أحدث أخبار سعر الدولار في السوق الموازي في السودان
     url = "https://duckduckgo.com"
     payload = {'q': 'سعر الدولار في السودان اليوم السوق الموازي'}
     headers = {
@@ -25,19 +24,18 @@ def fetch_from_search():
             soup = BeautifulSoup(resp.text, 'html.parser')
             snippets = [s.get_text(" ", strip=True) for s in soup.find_all('a', class_='result__snippet')]
             full_text = " ".join(snippets)
-            print("Extracted snippets sample:", full_text[:200])
+            print("Snippets sample:", full_text[:200])
             
-            # البحث عن جميع الأرقام المنطقية لسعر الدولار (من 2500 إلى 50000) في المقتطفات
             matches = re.findall(r'\b(\d{1,2}[,.]?\d{3})\b', full_text)
+            excluded_years = [2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027]
             valid_usd = []
+            
             for m in matches:
                 val = parse_price(m)
-                # استبعاد السنوات مثل 2024, 2025, 2026
-                if val and 2500 <= val <= 50000 and val not in:
+                if val and 2500 <= val <= 50000 and val not in excluded_years:
                     valid_usd.append(val)
             
             if valid_usd:
-                # أخذ السعر الأكثر تكراراً أو المتوسط
                 usd = max(set(valid_usd), key=valid_usd.count)
                 sar = round(usd / 3.75)
                 aed = round(usd / 3.67)
