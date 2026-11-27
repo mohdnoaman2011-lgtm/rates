@@ -1,6 +1,5 @@
 import json
 import re
-import urllib.parse
 import requests
 import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
@@ -9,32 +8,35 @@ from datetime import datetime, timezone
 JSON_FILE = 'rates.json'
 
 def normalize_digits(text):
-    # تحويل الأرقام الهندية (١٢٣) إلى إنجليزية (123)
     arabic_digits = "٠١٢٣٤٥٦٧٨٩"
     english_digits = "0123456789"
-    trans = str.maketrans(arabic_digits, english_digits)
-    return text.translate(trans)
+    return text.translate(str.maketrans(arabic_digits, english_digits))
 
 def parse_price(raw_str):
     clean = re.sub(r'[^\d]', '', raw_str)
     return int(clean) if clean else None
 
 def fetch_rates():
+    base_url = "https://news.google.com/rss/search"
     queries = [
-        'سعر الدولار في السودان اليوم السوق الموازي',
-        'أسعار العملات في السودان اليوم السوق الأسود'
+        "سعر الدولار في السودان اليوم السوق الموازي",
+        "أسعار العملات في السودان اليوم السوق الأسود"
     ]
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
     
     all_texts = []
     for q in queries:
-        encoded_q = urllib.parse.quote(q)
-        url = f"https://google.com{encoded_q}&hl=ar&gl=SD&ceid=SD:ar"
+        query_params = {
+            "q": q,
+            "hl": "ar",
+            "gl": "SD",
+            "ceid": "SD:ar"
+        }
         try:
-            resp = requests.get(url, headers=headers, timeout=20)
-            print(f"Status {resp.status_code} for query")
+            resp = requests.get(base_url, params=query_params, headers=headers, timeout=20)
+            print("Status code:", resp.status_code)
             if resp.status_code == 200:
                 root = ET.fromstring(resp.content)
                 for item in root.findall('.//item')[:20]:
@@ -43,12 +45,11 @@ def fetch_rates():
                     clean_item = BeautifulSoup(f"{t} {d}", 'html.parser').get_text(" ")
                     all_texts.append(normalize_digits(clean_item))
         except Exception as e:
-            print(f"Error: {e}")
+            print("Error:", e)
 
     full_text = " | ".join(all_texts)
-    print("Sample extracted text:", full_text[:400])
+    print("Sample text:", full_text[:300])
     
-    # البحث عن أرقام من 4 أو 5 خانات (مع أو بدون فاصلة)
     matches = re.findall(r'\b(\d{1,2}[,.]?\d{3})\b', full_text)
     excluded = {2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028}
     valid_usd = []
