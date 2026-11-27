@@ -18,10 +18,9 @@ def parse_price(raw_str):
 
 def fetch_rates():
     base_url = "https://news.google.com/rss/search"
-    # إضافة when:2d لحصر النتائج في أخبار آخر يومين فقط
     queries = [
-        "سعر الدولار في السودان اليوم السوق الموازي when:2d",
-        "أسعار العملات في السودان اليوم السوق الأسود when:2d"
+        "سعر الدولار في السودان اليوم السوق الموازي",
+        "أسعار العملات في السودان اليوم السوق الأسود"
     ]
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
@@ -49,20 +48,26 @@ def fetch_rates():
 
     full_text = " | ".join(all_texts)
     
-    # استخراج الأرقام المكونة من 5 خانات (مثل 12100 أو 12,100)
-    matches = re.findall(r'\b(\d{2}[,.]?\d{3})\b', full_text)
+    # استخراج جميع الأرقام من 4 أو 5 خانات
+    matches = re.findall(r'\b(\d{1,2}[,.]?\d{3})\b', full_text)
+    excluded = {2020, 2021, 2022, 2023, 2024, 2025, 2026, 2027, 2028}
     valid_usd = []
     
     for m in matches:
         val = parse_price(m)
-        # حصر النطاق المنطقي الحالي بين 10,000 و 30,000 جنيه
-        if val and 10000 <= val <= 30000:
+        if val and 3500 <= val <= 35000 and val not in excluded:
             valid_usd.append(val)
             
-    print("Found valid recent USD rates:", valid_usd)
+    print("All extracted numbers:", valid_usd)
     
     if valid_usd:
-        usd = max(set(valid_usd), key=valid_usd.count)
+        # إذا وجدنا أرقاماً في نطاق 10000 فما فوق نأخذها، وإلا نأخذ أعلى رقم متاح
+        high_rates = [v for v in valid_usd if v >= 10000]
+        if high_rates:
+            usd = max(set(high_rates), key=high_rates.count)
+        else:
+            usd = max(valid_usd)
+            
         sar = round(usd / 3.75)
         aed = round(usd / 3.67)
         egp = round(usd / 50)
@@ -87,9 +92,9 @@ def main():
         }
         with open(JSON_FILE, 'w', encoding='utf-8') as f:
             json.dump(output, f, ensure_ascii=False, indent=2)
-        print("SUCCESS: Updated rates.json with accurate daily rates!")
+        print("SUCCESS: Updated rates.json!")
     else:
-        print("WARNING: No recent numbers matched, keeping existing data.")
+        print("WARNING: No numbers matched, keeping existing data.")
 
 if __name__ == "__main__":
     main()
